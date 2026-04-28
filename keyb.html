@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TypeRace — Keyboard Speed Contest</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #d4a853;
+    --accent2: #c0392b;
+    --text: #e8e0d0;
+    --muted: #666;
+    --correct: #7fb069;
+    --wrong: #c0392b;
+    --key-bg: #1c1c1c;
+    --key-active: #d4a853;
+    --key-border: #333;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+    gap: 28px;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+  header p {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.06em;
+    font-style: italic;
+  }
+
+  /* ── Stats Bar ── */
+  .stats {
+    display: flex;
+    gap: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 32px;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 72px;
+  }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  .stat-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .stat-sep { width: 1px; background: var(--border); align-self: stretch; }
+
+  /* ── Progress Bar ── */
+  .progress-wrap {
+    width: 100%;
+    max-width: 780px;
+  }
+  .progress-bar-bg {
+    background: var(--surface2);
+    border-radius: 99px;
+    height: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #f0c070);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.15s ease;
+  }
+  .progress-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.08em;
+    text-align: right;
+  }
+
+  /* ── Text Display ── */
+  .text-display {
+    width: 100%;
+    max-width: 780px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    min-height: 88px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0;
+    line-height: 2;
+    font-size: 1.25rem;
+    letter-spacing: 0.01em;
+    position: relative;
+    overflow: hidden;
+  }
+  .char {
+    display: inline;
+    transition: color 0.08s;
+    color: var(--muted);
+  }
+  .char.correct { color: var(--correct); }
+  .char.wrong { color: var(--wrong); text-decoration: underline; }
+  .char.cursor {
+    position: relative;
+  }
+  .char.cursor::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: blink 0.9s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Input (hidden) ── */
+  #typing-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 1px; height: 1px;
+  }
+
+  /* ── Click-to-focus hint ── */
+  .click-hint {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: -12px;
+  }
+
+  /* ── Keyboard ── */
+  .keyboard-wrap {
+    width: 100%;
+    max-width: 780px;
+  }
+  .keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .kb-row {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+  }
+  .key {
+    background: var(--key-bg);
+    border: 1px solid var(--key-border);
+    border-bottom: 3px solid #111;
+    border-radius: 5px;
+    color: #aaa;
+    font-family: 'Crimson Pro', serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    width: 44px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.04em;
+    transition: background 0.08s, color 0.08s, transform 0.08s, border-color 0.08s;
+    user-select: none;
+    cursor: default;
+    text-transform: uppercase;
+    position: relative;
+  }
+  .key.wide-15 { width: 66px; font-size: 0.7rem; }
+  .key.wide-18 { width: 80px; font-size: 0.7rem; }
+  .key.wide-22 { width: 96px; font-size: 0.7rem; }
+  .key.space    { width: 240px; }
+  .key.pressed {
+    background: var(--key-active);
+    color: #000;
+    border-color: #b8903a;
+    border-bottom-color: #7a5f20;
+    transform: translateY(2px);
+  }
+  .key.correct-key {
+    background: var(--correct);
+    color: #fff;
+    border-color: #5a9048;
+    animation: pop 0.15s ease;
+  }
+  .key.wrong-key {
+    background: var(--wrong);
+    color: #fff;
+    border-color: #8b1e18;
+    animation: shake 0.15s ease;
+  }
+  @keyframes pop   { 0%{transform:scale(.9) translateY(2px)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0) translateY(2px)} 33%{transform:translateX(-3px) translateY(2px)} 66%{transform:translateX(3px) translateY(2px)} }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .btn {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.88rem;
+    letter-spacing: 0.08em;
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #111;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  .btn-primary:hover { background: #e8b85c; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: #555; }
+
+  /* ── Finish Overlay ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .overlay.show { display: flex; }
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 48px;
+    text-align: center;
+    max-width: 360px;
+    width: 90%;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  }
+  .result-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .result-card p { color: var(--muted); margin-bottom: 28px; font-style: italic; }
+  .result-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 32px;
+  }
+  .result-stat { display: flex; flex-direction: column; gap: 4px; }
+  .result-stat .val { font-family: 'Playfair Display', serif; font-size: 2.2rem; color: var(--accent); }
+  .result-stat .lbl { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TypeRace</h1>
+  <p>keyboard speed contest</p>
+</header>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat">
+    <span class="stat-value" id="wpm-val">0</span>
+    <span class="stat-label">WPM</span>
+  </div>
+  <div class="stat-sep"></div>
+  <div class="stat">
+    <span class="stat-value" id="acc-val">—</span>
+    <span class="stat-label">Accuracy</span>
+  </div>
+  <div class="stat-sep"></div>
+  <div class="stat">
+    <span class="stat-value" id="time-val">0</span>
+    <span class="stat-label">Seconds</span>
+  </div>
+  <div class="stat-sep"></div>
+  <div class="stat">
+    <span class="stat-value" id="err-val">0</span>
+    <span class="stat-label">Errors</span>
+  </div>
+</div>
+
+<!-- Progress -->
+<div class="progress-wrap">
+  <div class="progress-label" id="prog-label">0% complete</div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="prog-fill"></div>
+  </div>
+</div>
+
+<!-- Text -->
+<div class="text-display" id="text-display" tabindex="0" onclick="focusInput()">
+</div>
+<p class="click-hint" id="click-hint">Click the text area or press any key to start</p>
+
+<input type="text" id="typing-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+
+<!-- Keyboard -->
+<div class="keyboard-wrap">
+  <div class="keyboard" id="keyboard">
+    <!-- Row 0: Numbers -->
+    <div class="kb-row">
+      <div class="key" data-key="`">`</div>
+      <div class="key" data-key="1">1</div>
+      <div class="key" data-key="2">2</div>
+      <div class="key" data-key="3">3</div>
+      <div class="key" data-key="4">4</div>
+      <div class="key" data-key="5">5</div>
+      <div class="key" data-key="6">6</div>
+      <div class="key" data-key="7">7</div>
+      <div class="key" data-key="8">8</div>
+      <div class="key" data-key="9">9</div>
+      <div class="key" data-key="0">0</div>
+      <div class="key" data-key="-">-</div>
+      <div class="key" data-key="=">=</div>
+      <div class="key wide-18" data-key="Backspace">⌫ Back</div>
+    </div>
+    <!-- Row 1: QWERTY -->
+    <div class="kb-row">
+      <div class="key wide-15" data-key="Tab">Tab</div>
+      <div class="key" data-key="q">Q</div>
+      <div class="key" data-key="w">W</div>
+      <div class="key" data-key="e">E</div>
+      <div class="key" data-key="r">R</div>
+      <div class="key" data-key="t">T</div>
+      <div class="key" data-key="y">Y</div>
+      <div class="key" data-key="u">U</div>
+      <div class="key" data-key="i">I</div>
+      <div class="key" data-key="o">O</div>
+      <div class="key" data-key="p">P</div>
+      <div class="key" data-key="[">[</div>
+      <div class="key" data-key="]">]</div>
+      <div class="key wide-15" data-key="\\">\</div>
+    </div>
+    <!-- Row 2: ASDF -->
+    <div class="kb-row">
+      <div class="key wide-18" data-key="CapsLock">Caps</div>
+      <div class="key" data-key="a">A</div>
+      <div class="key" data-key="s">S</div>
+      <div class="key" data-key="d">D</div>
+      <div class="key" data-key="f">F</div>
+      <div class="key" data-key="g">G</div>
+      <div class="key" data-key="h">H</div>
+      <div class="key" data-key="j">J</div>
+      <div class="key" data-key="k">K</div>
+      <div class="key" data-key="l">L</div>
+      <div class="key" data-key=";">;</div>
+      <div class="key" data-key="'">'</div>
+      <div class="key wide-22" data-key="Enter">Enter</div>
+    </div>
+    <!-- Row 3: ZXCV -->
+    <div class="kb-row">
+      <div class="key wide-22" data-key="Shift">⇧ Shift</div>
+      <div class="key" data-key="z">Z</div>
+      <div class="key" data-key="x">X</div>
+      <div class="key" data-key="c">C</div>
+      <div class="key" data-key="v">V</div>
+      <div class="key" data-key="b">B</div>
+      <div class="key" data-key="n">N</div>
+      <div class="key" data-key="m">M</div>
+      <div class="key" data-key=",">,</div>
+      <div class="key" data-key=".">.</div>
+      <div class="key" data-key="/">/</div>
+      <div class="key wide-22" data-key="Shift">⇧ Shift</div>
+    </div>
+    <!-- Row 4: Space -->
+    <div class="kb-row">
+      <div class="key wide-22" data-key="Control">Ctrl</div>
+      <div class="key wide-15" data-key="Alt">Alt</div>
+      <div class="key space" data-key=" ">SPACE</div>
+      <div class="key wide-15" data-key="Alt">Alt</div>
+      <div class="key wide-22" data-key="Control">Ctrl</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn btn-primary" onclick="restartGame()">↺ Restart</button>
+  <button class="btn btn-ghost" onclick="nextQuote()">Next Quote →</button>
+</div>
+
+<!-- Finish Overlay -->
+<div class="overlay" id="overlay">
+  <div class="result-card">
+    <h2>Well Done!</h2>
+    <p id="result-sub">Here's how you performed</p>
+    <div class="result-stats">
+      <div class="result-stat">
+        <span class="val" id="res-wpm">0</span>
+        <span class="lbl">WPM</span>
+      </div>
+      <div class="result-stat">
+        <span class="val" id="res-acc">0%</span>
+        <span class="lbl">Accuracy</span>
+      </div>
+      <div class="result-stat">
+        <span class="val" id="res-time">0s</span>
+        <span class="lbl">Time</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const QUOTES = [
+  "The quick brown fox jumps over the lazy dog near the riverbank.",
+  "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+  "In the middle of difficulty lies opportunity. Every obstacle is a stepping stone.",
+  "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment.",
+  "The only way to do great work is to love what you do and never stop learning.",
+  "Life is what happens when you are busy making other plans and dreaming of the future.",
+  "The future belongs to those who believe in the beauty of their dreams and work tirelessly.",
+  "It does not matter how slowly you go as long as you do not stop moving forward.",
+  "Everything you have ever wanted is on the other side of fear. Face it and move ahead.",
+  "Believe you can and you are halfway there. The rest is persistence and dedication.",
+];
+
+let currentText = '';
+let currentIndex = 0;
+let errors = 0;
+let startTime = null;
+let timerInterval = null;
+let totalTyped = 0;
+let gameActive = false;
+let quoteIdx = 0;
+
+const displayEl   = document.getElementById('text-display');
+const inputEl     = document.getElementById('typing-input');
+const wpmEl       = document.getElementById('wpm-val');
+const accEl       = document.getElementById('acc-val');
+const timeEl      = document.getElementById('time-val');
+const errEl       = document.getElementById('err-val');
+const progFill    = document.getElementById('prog-fill');
+const progLabel   = document.getElementById('prog-label');
+const overlayEl   = document.getElementById('overlay');
+const clickHint   = document.getElementById('click-hint');
+
+function buildDisplay() {
+  displayEl.innerHTML = '';
+  for (let i = 0; i < currentText.length; i++) {
+    const span = document.createElement('span');
+    span.classList.add('char');
+    span.textContent = currentText[i] === ' ' ? '\u00A0' : currentText[i];
+    span.dataset.index = i;
+    displayEl.appendChild(span);
+  }
+  updateCursor();
+}
+
+function updateCursor() {
+  document.querySelectorAll('.char').forEach(el => el.classList.remove('cursor'));
+  const cur = document.querySelector(`.char[data-index="${currentIndex}"]`);
+  if (cur) cur.classList.add('cursor');
+}
+
+function focusInput() {
+  inputEl.focus();
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    const elapsed = ((Date.now() - startTime) / 1000);
+    timeEl.textContent = elapsed.toFixed(1);
+    updateWPM(elapsed);
+  }, 100);
+}
+
+function updateWPM(elapsed) {
+  if (elapsed <= 0) return;
+  const words = currentIndex / 5;
+  const wpm = Math.round((words / elapsed) * 60);
+  wpmEl.textContent = wpm;
+}
+
+function updateAccuracy() {
+  if (totalTyped === 0) { accEl.textContent = '—'; return; }
+  const acc = Math.round(((totalTyped - errors) / totalTyped) * 100);
+  accEl.textContent = acc + '%';
+}
+
+function updateProgress() {
+  const pct = Math.round((currentIndex / currentText.length) * 100);
+  progFill.style.width = pct + '%';
+  progLabel.textContent = pct + '% complete';
+}
+
+function highlightKey(key, isCorrect) {
+  let k = key.toLowerCase();
+  // Map special
+  const selector = document.querySelector(`.key[data-key="${k}"]`);
+  if (!selector) return;
+  selector.classList.add(isCorrect ? 'correct-key' : 'wrong-key');
+  setTimeout(() => {
+    selector.classList.remove('correct-key', 'wrong-key');
+  }, 180);
+}
+
+function pressKey(key) {
+  let k = key.toLowerCase();
+  const selector = document.querySelector(`.key[data-key="${k}"]`);
+  if (selector) {
+    selector.classList.add('pressed');
+    setTimeout(() => selector.classList.remove('pressed'), 120);
+  }
+}
+
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); return; }
+
+  pressKey(e.key === ' ' ? ' ' : e.key);
+
+  if (!gameActive) return;
+
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    if (currentIndex > 0) {
+      currentIndex--;
+      const charEl = document.querySelector(`.char[data-index="${currentIndex}"]`);
+      if (charEl) { charEl.classList.remove('correct', 'wrong'); }
+      updateCursor();
+    }
+    return;
+  }
+
+  if (e.key.length > 1) return; // ignore ctrl, shift etc
+
+  const expected = currentText[currentIndex];
+  const typed = e.key;
+  totalTyped++;
+
+  const charEl = document.querySelector(`.char[data-index="${currentIndex}"]`);
+  const isCorrect = typed === expected;
+
+  if (isCorrect) {
+    charEl.classList.add('correct');
+    highlightKey(typed, true);
+  } else {
+    charEl.classList.add('wrong');
+    errors++;
+    errEl.textContent = errors;
+    highlightKey(typed, false);
+  }
+
+  currentIndex++;
+  updateCursor();
+  updateAccuracy();
+  updateProgress();
+
+  if (currentIndex >= currentText.length) {
+    finishGame();
+  }
+});
+
+// Also handle physical keyboard even if input not focused
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement !== inputEl) {
+    if (e.key.length === 1 || e.key === 'Backspace') {
+      inputEl.focus();
+    }
+  }
+  // start on first key
+  if (!gameActive && !overlayEl.classList.contains('show')) {
+    if (e.key.length === 1) {
+      startGame();
+    }
+  }
+});
+
+function startGame() {
+  gameActive = true;
+  startTime = Date.now();
+  clickHint.textContent = 'Type the text above — press Backspace to correct';
+  startTimer();
+}
+
+function finishGame() {
+  gameActive = false;
+  clearInterval(timerInterval);
+  const elapsed = (Date.now() - startTime) / 1000;
+  const wpm = Math.round(((currentText.length / 5) / elapsed) * 60);
+  const acc = Math.round(((totalTyped - errors) / totalTyped) * 100);
+  document.getElementById('res-wpm').textContent = wpm;
+  document.getElementById('res-acc').textContent = acc + '%';
+  document.getElementById('res-time').textContent = elapsed.toFixed(1) + 's';
+
+  const msgs = [
+    wpm >= 80 ? "Blazing fast! You're a typing legend." :
+    wpm >= 60 ? "Great speed! Keep pushing." :
+    wpm >= 40 ? "Solid performance. Room to grow!" :
+    "Practice makes perfect. Keep going!"
+  ];
+  document.getElementById('result-sub').textContent = msgs[0];
+  overlayEl.classList.add('show');
+}
+
+function resetState() {
+  clearInterval(timerInterval);
+  currentIndex = 0;
+  errors = 0;
+  totalTyped = 0;
+  startTime = null;
+  gameActive = false;
+  wpmEl.textContent = '0';
+  accEl.textContent = '—';
+  timeEl.textContent = '0';
+  errEl.textContent = '0';
+  progFill.style.width = '0%';
+  progLabel.textContent = '0% complete';
+  clickHint.textContent = 'Click the text area or press any key to start';
+  overlayEl.classList.remove('show');
+}
+
+function restartGame() {
+  resetState();
+  buildDisplay();
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+function nextQuote() {
+  quoteIdx = (quoteIdx + 1) % QUOTES.length;
+  currentText = QUOTES[quoteIdx];
+  resetState();
+  buildDisplay();
+  inputEl.value = '';
+  inputEl.focus();
+}
+
+// Init
+currentText = QUOTES[quoteIdx];
+buildDisplay();
+inputEl.focus();
+</script>
+</body>
+</html>
